@@ -1,0 +1,30 @@
+{
+    "expo": {
+        "name": "VoiceBot",
+        "slug": "voicebot-rag",
+        "version": "1.0.0",
+        "orientation": "portrait",
+        "userInterfaceStyle": "dark",
+        "splash": {
+            "backgroundColor": "#070710"
+        },
+        "ios": {
+            "supportsTablet": false,
+            "infoPlist": {
+                "NSMicrophoneUsageDescription": "VoiceBot needs microphone access to listen to your questions."
+            }
+        },
+        "android": {
+            "permissions": [
+                "RECORD_AUDIO"
+            ],
+            "package": "com.voicebot.ragapp"
+        },
+        "web": {
+            "bundler": "metro"
+        },
+        "plugins": [
+            "expo-router"
+        ]
+    }
+}
