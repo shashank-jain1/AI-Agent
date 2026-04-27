@@ -13,7 +13,7 @@ export interface Message {
     isTyping?: boolean
 }
 
-export function useVoiceAgent(language: 'en' | 'hi') {
+export function useVoiceAgent(language: 'en' | 'hi', selectedDocIds: string[] = []) {
     const [status, setStatus] = useState<AgentStatus>('idle')
     const [transcript, setTranscript] = useState('')
     const [messages, setMessages] = useState<Message[]>([])
@@ -138,7 +138,7 @@ export function useVoiceAgent(language: 'en' | 'hi') {
             addMessage({ id: uid(), role: 'ai', text: '', isTyping: true })
 
             try {
-                const data = await sendVoiceQuery(audioBlob, language, sessionId.current)
+                const data = await sendVoiceQuery(audioBlob, language, sessionId.current, 'web', selectedDocIds)
                 setTranscript(data.query)
 
                 // Update user message with actual transcription
@@ -220,7 +220,7 @@ export function useVoiceAgent(language: 'en' | 'hi') {
             addMessage({ id: uid(), role: 'ai', text: '', isTyping: true })
 
             try {
-                const data = await sendTextQuery(text, language, sessionId.current)
+                const data = await sendTextQuery(text, language, sessionId.current, selectedDocIds)
                 updateLastAiMessage({ text: data.answer, sources: data.sources, isTyping: false })
 
                 if (autoDictateRef.current) {

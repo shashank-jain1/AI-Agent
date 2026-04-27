@@ -43,8 +43,9 @@ uvicorn main:app --reload --port 8000
 **Start the Celery worker (in a separate terminal):**
 ```bash
 cd backend
-celery -A workers.celery_worker worker --loglevel=info --concurrency=2
+celery -A workers.celery_worker:celery_app worker --loglevel=info --concurrency=2
 ```
+> On Windows, prefer adding `--pool=solo`.
 > Redis must be running locally. [Download for Windows](https://github.com/microsoftarchive/redis/releases) or run in WSL.
 
 ### Step 3 — Frontend (Web + Admin)

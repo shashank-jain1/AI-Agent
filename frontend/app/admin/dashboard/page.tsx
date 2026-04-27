@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { getAutoDictate, setAutoDictate } from '@/lib/api'
-import { FileText, MessageSquare, BarChart2, Activity, Volume2 } from 'lucide-react'
+import { getAutoDictate, setAutoDictate, getFileSelection, setFileSelection } from '@/lib/api'
+import { FileText, MessageSquare, BarChart2, Activity, Volume2, Files } from 'lucide-react'
 import { AdminSidebar } from '@/components/admin/AdminSidebar'
 
 function StatCard({ icon: Icon, label, value, color }: any) {
@@ -38,6 +38,7 @@ export default function DashboardPage() {
         today_queries: 0,
     })
     const [autoDictate, setAutoDictateState] = useState(true)
+    const [fileSelection, setFileSelectionState] = useState(false)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -51,14 +52,15 @@ export default function DashboardPage() {
             }
 
             try {
-                const [docsRes, faqsRes, queriesRes, dictateRes] = await Promise.all([
+                const [docsRes, faqsRes, queriesRes, dictateRes, fileSelRes] = await Promise.all([
                     supabase.from('documents').select('status', { count: 'exact' }),
                     supabase.from('faqs').select('id', { count: 'exact' }).eq('is_active', true),
                     supabase
                         .from('query_logs')
                         .select('id', { count: 'exact' })
                         .gte('created_at', new Date(Date.now() - 86400000).toISOString()),
-                    getAutoDictate()
+                    getAutoDictate(),
+                    getFileSelection(),
                 ])
 
                 const total_docs = docsRes.count ?? 0
@@ -69,6 +71,7 @@ export default function DashboardPage() {
 
                 setStats({ total_docs, indexed_docs, total_faqs, today_queries })
                 setAutoDictateState(dictateRes)
+                setFileSelectionState(fileSelRes)
             } catch (e) {
                 console.error('Stats fetch failed:', e)
             }
@@ -90,6 +93,17 @@ export default function DashboardPage() {
         } catch (e) {
             console.error('Failed to toggle auto dictate', e)
             setAutoDictateState(autoDictate) // revert
+        }
+    }
+
+    const toggleFileSelection = async () => {
+        try {
+            const newVal = !fileSelection
+            setFileSelectionState(newVal)
+            await setFileSelection(newVal)
+        } catch (e) {
+            console.error('Failed to toggle file selection', e)
+            setFileSelectionState(fileSelection) // revert
         }
     }
 
@@ -119,22 +133,45 @@ export default function DashboardPage() {
                     )}
 
                     <h2 className="text-white text-lg font-bold mt-10 mb-4" style={{ fontFamily: 'Syne, sans-serif' }}>Global Settings</h2>
-                    <div className="flex items-center justify-between p-5 rounded-2xl max-w-2xl bg-white/[0.04] border border-white/[0.08]">
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-500/10">
-                                <Volume2 size={18} className="text-blue-400" />
+                    <div className="flex flex-col gap-4 max-w-2xl">
+                        {/* Auto-Dictate toggle */}
+                        <div className="flex items-center justify-between p-5 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-500/10">
+                                    <Volume2 size={18} className="text-blue-400" />
+                                </div>
+                                <div>
+                                    <p className="text-white font-medium text-sm">Auto-Dictate Answers</p>
+                                    <p className="text-white/40 text-xs mt-0.5">VoiceBot will automatically speak its replies when enabled</p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-white font-medium text-sm">Auto-Dictate Answers</p>
-                                <p className="text-white/40 text-xs mt-0.5">VoiceBot will automatically speak its replies when enabled</p>
-                            </div>
+                            <button
+                                onClick={toggleAutoDictate}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${autoDictate ? 'bg-blue-600' : 'bg-white/10'}`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoDictate ? 'translate-x-6' : 'translate-x-1'}`} />
+                            </button>
                         </div>
-                        <button
-                            onClick={toggleAutoDictate}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${autoDictate ? 'bg-blue-600' : 'bg-white/10'}`}
-                        >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoDictate ? 'translate-x-6' : 'translate-x-1'}`} />
-                        </button>
+
+                        {/* File Selection Mode toggle */}
+                        <div className="flex items-center justify-between p-5 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-purple-500/10">
+                                    <Files size={18} className="text-purple-400" />
+                                </div>
+                                <div>
+                                    <p className="text-white font-medium text-sm">File Selection Mode</p>
+                                    <p className="text-white/40 text-xs mt-0.5">Users can filter chatbot answers to specific indexed documents</p>
+                                </div>
+                            </div>
+                            <button
+                                id="toggle-file-selection"
+                                onClick={toggleFileSelection}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${fileSelection ? 'bg-purple-600' : 'bg-white/10'}`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fileSelection ? 'translate-x-6' : 'translate-x-1'}`} />
+                            </button>
+                        </div>
                     </div>
 
                     <div className="mt-8 flex flex-wrap gap-4 pb-8">

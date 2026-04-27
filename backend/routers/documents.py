@@ -138,6 +138,22 @@ def list_documents(
     return result.data
 
 
+@router.get("/public")
+def list_public_documents():
+    """Public endpoint — returns id, filename, original_name for all indexed documents.
+    Used by the frontend chat page to show the document selection picker (no auth required)."""
+    result = (
+        get_db()
+        .table("documents")
+        .select("id,filename,original_name")
+        .eq("status", "indexed")
+        .order("original_name")
+        .execute()
+    )
+    return result.data or []
+
+
+
 @router.get("/{document_id}/status", response_model=DocumentStatusResponse)
 def get_document_status(document_id: str):
     """Public polling endpoint — used by admin UI for real-time status."""

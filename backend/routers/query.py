@@ -27,6 +27,7 @@ async def text_query(request: Request, body: QueryRequest):
             language=body.language if body.language != "auto" else "en",
             session_id=body.session_id,
             client_type=body.client_type,
+            document_ids=body.document_ids if body.document_ids else None,
         )
         return QueryResponse(**result)
     except Exception as e:

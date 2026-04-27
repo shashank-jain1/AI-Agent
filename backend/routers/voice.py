@@ -10,6 +10,7 @@ import uuid
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
+from typing import List, Optional
 
 from services import stt, tts, rag
 from models.schemas import TranscribeResponse, SynthesizeRequest, VoiceQueryResponse
@@ -82,14 +83,27 @@ async def voice_query_endpoint(
     session_id: str = Form(default_factory=lambda: str(uuid.uuid4())),
     client_type: str = Form("web"),
     tts_enabled: str = Form("true", alias="tts"),
+    document_ids: str = Form(""),
 ):
     """
     Unified voice query endpoint:
     1. Transcribe audio → query text
-    2. RAG: retrieve + GPT-4o answer
+    2. RAG: retrieve + Gemini answer (optionally scoped to selected documents)
     3. TTS: synthesize answer audio (if tts=true)
     4. Return JSON with transcription, answer, sources, and base64 audio
     """
+    import json as _json
+
+    # Parse document_ids from JSON-encoded string (e.g. '["id1","id2"]')
+    parsed_doc_ids: Optional[List[str]] = None
+    if document_ids.strip():
+        try:
+            parsed = _json.loads(document_ids)
+            if isinstance(parsed, list) and parsed:
+                parsed_doc_ids = parsed
+        except Exception:
+            logger.warning(f"Could not parse document_ids form field: {document_ids!r}")
+
     ext = os.path.splitext(audio.filename or "audio.webm")[1] or ".webm"
     tmp_input = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
     tmp_wav = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
@@ -122,6 +136,7 @@ async def voice_query_endpoint(
             language=detected_language,
             session_id=session_id,
             client_type=client_type,
+            document_ids=parsed_doc_ids,
         )
 
         # Step 4: TTS (optional)

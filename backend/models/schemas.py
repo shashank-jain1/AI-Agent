@@ -26,6 +26,14 @@ class DocumentStatusResponse(BaseModel):
 
 # ── FAQs ─────────────────────────────────────────────────────────────────────
 
+class AutoDictateRequest(BaseModel):
+    auto_dictate: bool
+
+
+class FileSelectionRequest(BaseModel):
+    file_selection_enabled: bool
+
+
 class FAQCreateRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=1000)
     answer: str = Field(..., min_length=3, max_length=5000)
@@ -51,6 +59,7 @@ class QueryRequest(BaseModel):
     language: str = Field("en", pattern="^(en|hi|auto)$")
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     client_type: str = Field("web", pattern="^(web|mobile)$")
+    document_ids: list[str] = Field(default_factory=list)
 
 
 class SourceChunk(BaseModel):

@@ -6,7 +6,7 @@ import os
 import time
 import logging
 import asyncio
-from typing import Optional
+from typing import Optional, List
 
 from google import genai
 
@@ -78,14 +78,16 @@ def answer_query(
     language: str,
     session_id: str,
     client_type: str = "web",
+    document_ids: Optional[List[str]] = None,
 ) -> dict:
     """
     Full RAG pipeline:
       1. Embed query
       2. Vector similarity search (chunks + FAQs)
-      3. Build context
-      4. Gemini completion
-      5. Log to analytics
+      3. Optional: filter chunks to selected document IDs
+      4. Build context
+      5. Gemini completion
+      6. Log to analytics
     """
     start_time = time.time()
 
@@ -105,11 +107,19 @@ def answer_query(
 
     chunks = rpc_result.data or []
 
+    # Step 3: Filter to selected documents (if file-selection mode is active)
+    if document_ids:
+        chunks = [c for c in chunks if c.get("document_id") in document_ids]
+        logger.info(
+            f"File-selection filter applied: {len(document_ids)} doc(s), "
+            f"{len(chunks)} chunks retained."
+        )
+
     # Normalize language to 'hi' or 'en'
     if language not in ("hi", "en"):
         language = "en"
 
-    # Step 3: Handle no results
+    # Step 4: Handle no results
     if not chunks:
         logger.info(f"No relevant chunks found for: {query[:80]}")
         response_time_ms = int((time.time() - start_time) * 1000)
@@ -123,7 +133,7 @@ def answer_query(
             "response_time_ms": response_time_ms,
         }
 
-    # Step 4: Build context string
+    # Step 5: Build context string
     context_parts = []
     sources = []
     for chunk in chunks:
@@ -140,7 +150,7 @@ def answer_query(
         )
     context = "\n\n".join(context_parts)
 
-    # Step 5: Gemini completion
+    # Step 6: Gemini completion
     client = _get_gemini_client()
     
     # Send system prompt and query as contents
@@ -155,7 +165,7 @@ def answer_query(
     answer = completion.text.strip() if completion.text else "No response generated."
     response_time_ms = int((time.time() - start_time) * 1000)
 
-    # Step 6: Log async (fire-and-forget, don't block)
+    # Step 7: Log async (fire-and-forget, don't block)
     _log_query(query, language, answer, len(chunks), response_time_ms, client_type, session_id)
 
     logger.info(

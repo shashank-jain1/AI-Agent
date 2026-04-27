@@ -3,18 +3,20 @@ Tesseract OCR service for extracting text from scanned images and PDFs.
 
 System dependencies required:
   Windows : Install Tesseract from https://github.com/UB-Mannheim/tesseract/wiki
-            Add to PATH or set pytesseract.pytesseract.tesseract_cmd
-  Linux   : apt-get install tesseract-ocr tesseract-ocr-hin poppler-utils
+            Add to PATH or set TESSERACT_CMD env var.
+  Linux   : apt-get install tesseract-ocr tesseract-ocr-hin
+
+NOTE: pdf2image / Poppler are NOT required. PDF pages are rendered via
+      PyMuPDF (fitz) which is already installed and needs no native extras.
 """
-import io
 import logging
 import os
+import re
 from typing import List, Dict
 
-import fitz  # PyMuPDF
+import fitz  # PyMuPDF — used for both text extraction and page rendering
 import pytesseract
 from PIL import Image
-from pdf2image import convert_from_path
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +55,7 @@ def is_pdf_scanned(pdf_path: str) -> bool:
 
 
 def _preprocess_image(img: Image.Image) -> Image.Image:
-    """Convert to grayscale RGB, ensure minimum 300 DPI equivalent size."""
+    """Convert to grayscale, ensure minimum 300 DPI equivalent size."""
     img = img.convert("RGB")
     width, height = img.size
     # Upscale if image is too small (heuristic: < 1000px wide → double it)
@@ -65,7 +67,6 @@ def _preprocess_image(img: Image.Image) -> Image.Image:
 
 def _clean_ocr_text(text: str) -> str:
     """Post-process OCR output: remove very short lines, normalize whitespace."""
-    import re
     lines = text.splitlines()
     cleaned = [line for line in lines if len(line.strip()) >= 3]
     result = "\n".join(cleaned)
@@ -105,14 +106,27 @@ def extract_text_from_pil_image(img: Image.Image) -> str:
 
 def ocr_pdf_pages(pdf_path: str) -> List[Dict]:
     """
-    Convert each page of a PDF to a 300-DPI image and run OCR.
+    Render each PDF page to a 300-DPI image using PyMuPDF (no Poppler needed)
+    and run Tesseract OCR on each page.
     Returns: [{page_number (1-indexed), text}]
     """
-    logger.info(f"Running OCR on PDF: {pdf_path}")
-    pages_images = convert_from_path(pdf_path, dpi=300)
+    logger.info(f"Running OCR on PDF via PyMuPDF renderer: {pdf_path}")
     results: List[Dict] = []
-    for idx, page_img in enumerate(pages_images, start=1):
-        text = extract_text_from_pil_image(page_img)
-        results.append({"page_number": idx, "text": text})
-        logger.debug(f"  Page {idx}: {len(text)} chars extracted via OCR")
+
+    doc = fitz.open(pdf_path)
+    # 300 DPI → scale factor relative to PyMuPDF's 72-DPI default
+    zoom = 300 / 72  # ≈ 4.167
+    matrix = fitz.Matrix(zoom, zoom)
+
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+        # Render page to a pixmap (RGB, no alpha)
+        pix = page.get_pixmap(matrix=matrix, alpha=False)
+        # Convert raw pixmap bytes → PIL Image
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        text = extract_text_from_pil_image(img)
+        results.append({"page_number": page_num + 1, "text": text})
+        logger.debug(f"  Page {page_num + 1}: {len(text)} chars extracted via OCR")
+
+    doc.close()
     return results
